@@ -92,6 +92,7 @@ CtrlSortFilter::CtrlSortFilter( ListItems * i_parent,
 	m_filter_menu->setToolTip("RMB to select filtering field.");
 
 	QLineEdit * lineEdit = new QLineEdit( afqt::stoq(*m_filter), this);
+	lineEdit->setClearButtonEnabled(true);
 
 	QHBoxLayout * layout = new QHBoxLayout(this);
 	layout->addWidget(m_sort_label);
