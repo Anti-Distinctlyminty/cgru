@@ -69,16 +69,23 @@ class AfanasySubmitter(lwsdk.IGeneric):
             ),
         )
 
-        if lwsdk.pris.layout.cs.savescenecopy(temp_filename) == 0:
-            self.log.critical("Could not save scene copy to {}".format(temp_filename))
-            lwsdk.pris.error("Could not save scene copy to {}".format(temp_filename))
+        if self.crate_temporary_scene.get_int():
+            if lwsdk.pris.layout.cs.savescenecopy(temp_filename) == 0:
+                self.log.critical(
+                    "Could not save scene copy to {}".format(temp_filename)
+                )
+                lwsdk.pris.error(
+                    "Could not save scene copy to {}".format(temp_filename)
+                )
 
         cmd = [
             "lwsn_af.cmd",
             "-3",
             '-c"{}"'.format(self.config_dir_ctl.get_str()),
             '-d"{}"'.format(lwsdk.LWDirInfoFunc(lwsdk.LWFTYPE_CONTENT)),
-            '"{}"'.format(temp_filename),
+            '"{}"'.format(
+                temp_filename if self.crate_temporary_scene.get_int() else filename
+            ),
             "@#@",
             "@#@",
             str(self.frame_step_ctl.get_int()),
@@ -87,7 +94,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
         # If this is a "rez" configured environment supply the same environment to
         # the render command
         if "REZ_USED_RESOLVE" in os.environ:
-            cmd = ["rez-env", os.environ["REZ_USED_RESOLVE"], "--"] + cmd
+            cmd = ["rez-env", os.environ["REZ_USED_RESOLVE"], "--no-local", "--"] + cmd
 
         self.log.debug("Using command: {}".format(" ".join(cmd)))
 
@@ -105,7 +112,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
             self.frames_per_task_ctl.get_int(),
         )
         block.setWorkingDirectory(os.path.split(scene.filename)[0])
-        block.setTaskMaxRunTime(str(self.timeout_ctl.get_int()))
+        block.setTaskMaxRunTime(str(self.task_max_run_time.get_int()))
 
         if self.images_ctl.get_str():
             images = self.images_ctl.get_str().replace("%", "%%")
@@ -115,16 +122,20 @@ class AfanasySubmitter(lwsdk.IGeneric):
             job.setFolder("output", os.path.pardir(images))
 
         if self.host_mask_ctl.get_str():
-            block.setHostsMask(self.host_mask_ctl.get_str())
+            self.log.debug("Setting host mask: {}".format(self.host_mask_ctl.get_str()))
+            job.setHostsMask(self.host_mask_ctl.get_str())
 
         job.setPriority(str(self.priority_ctl.get_int()))
-        job.setPostDeleteFiles(str(temp_filename))
+        if self.crate_temporary_scene.get_int():
+            self.log.debug("Setting post delete file: {}".format(temp_filename))
+            job.setPostDeleteFiles(str(temp_filename))
         job.blocks.append(block)
 
-        self.log.debug(str(job))
         self.log.info("Submitting")
+        response = job.send(verbose=True)
+        self.log.debug("Submission response {}".format(response))
 
-        return job.send(verbose=True)
+        return (False, None) if response is False else response
 
     def help_popup(self, ctl, data):
         self.log.debug("Creating help popup panel")
@@ -182,6 +193,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
                 "Creating default config file {}".format(self.config_path),
             )
             config_parser.add_section("defaults")
+            config_parser.set("defaults", "create_temporary_scene", "1")
             config_parser.set("defaults", "frames_per_task", "10")
             config_parser.set("defaults", "priority", "99")
             config_parser.set(
@@ -189,7 +201,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
             )
             config_parser.set("defaults", "branch", "")
             config_parser.set("defaults", "host_mask", "")
-            config_parser.set("defaults", "timeout", "999")
+            config_parser.set("defaults", "task_max_run_time", "999")
             config_parser.set("defaults", "images", "")
 
             with open(self.config_path, "w") as f:
@@ -200,6 +212,10 @@ class AfanasySubmitter(lwsdk.IGeneric):
 
         self.job_name_ctl = panel.str_ctl("Job Name", self._ctl_width)
         self.job_name_ctl.set_str(self.job_name)
+        self.crate_temporary_scene = panel.bool_ctl("Create temporary scene")
+        self.crate_temporary_scene.set_int(
+            int(config_parser.get("defaults", "create_temporary_scene"))
+        )
         self.frame_start_ctl = panel.int_ctl("frame_start")
         self.frame_start_ctl.set_int(self.frame_start)
         self.frame_end_ctl = panel.int_ctl("frame_end")
@@ -219,8 +235,10 @@ class AfanasySubmitter(lwsdk.IGeneric):
         self.config_dir_ctl.set_str(config_parser.get("defaults", "config_dir"))
         self.host_mask_ctl = panel.str_ctl("Hosts Mask", self._ctl_width)
         self.host_mask_ctl.set_str(config_parser.get("defaults", "host_mask"))
-        self.timeout_ctl = panel.int_ctl("Timeout")
-        self.timeout_ctl.set_int(int(config_parser.get("defaults", "timeout")))
+        self.task_max_run_time = panel.int_ctl("Task Max Run Time")
+        self.task_max_run_time.set_int(
+            int(config_parser.get("defaults", "task_max_run_time"))
+        )
         self.images_ctl = panel.file_ctl("Preview Images", self._ctl_width)
         self.images_ctl.set_str(config_parser.get("defaults", "images"))
 
@@ -253,10 +271,18 @@ class AfanasySubmitter(lwsdk.IGeneric):
             "Afanasy Submitter", "Saving config file {}".format(self.config_path)
         )
 
+        config_parser.set(
+            "defaults", "create_temporary_scene", self.crate_temporary_scene.get_int()
+        )
+        config_parser.set(
+            "defaults", "frames_per_task", self.frames_per_task_ctl.get_int()
+        )
         config_parser.set("defaults", "priority", self.priority_ctl.get_int())
         config_parser.set("defaults", "config_dir", self.config_dir_ctl.get_str())
         config_parser.set("defaults", "host_mask", self.host_mask_ctl.get_str())
-        config_parser.set("defaults", "timeout", self.timeout_ctl.get_int())
+        config_parser.set(
+            "defaults", "task_max_run_time", self.task_max_run_time.get_int()
+        )
         config_parser.set("defaults", "images", self.images_ctl.get_str())
 
         with open(self.config_path, "w") as f:
