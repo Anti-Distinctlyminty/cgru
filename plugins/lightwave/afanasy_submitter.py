@@ -81,8 +81,10 @@ class AfanasySubmitter(lwsdk.IGeneric):
         cmd = [
             "lwsn_af.cmd",
             "-3",
-            '-c"{}"'.format(self.config_dir_ctl.get_str()),
-            '-d"{}"'.format(lwsdk.LWDirInfoFunc(lwsdk.LWFTYPE_CONTENT)),
+            '-c"{}"'.format(os.path.normpath(self.config_dir_ctl.get_str())),
+            '-d"{}"'.format(
+                os.path.normpath(lwsdk.LWDirInfoFunc(lwsdk.LWFTYPE_CONTENT))
+            ),
             '"{}"'.format(
                 temp_filename if self.crate_temporary_scene.get_int() else filename
             ),
