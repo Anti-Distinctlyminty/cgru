@@ -411,7 +411,14 @@ class BlockParameters:
 
             cmd += ' -X %s -F @#@-@#@x%d -x \"%s\"' % \
                    (self.writename, self.frameinc, i_scene_path)
-
+            
+            # If this is a "rez" configured environment supply 
+            # the same environment to the render command
+            if "REZ_USED_RESOLVE" in os.environ:
+                    cmd = 'rez-env {} --no-local -- {}'.format(
+                        os.environ["REZ_USED_RESOLVE"],
+                        cmd
+                    )
             block.setCommand(cmd)
 
         elif self.wnode.Class() == DailiesNodeClassName:
