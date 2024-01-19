@@ -127,7 +127,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
             self.log.debug("Setting host mask: {}".format(self.host_mask_ctl.get_str()))
             job.setHostsMask(self.host_mask_ctl.get_str())
 
-        job.setPriority(str(self.priority_ctl.get_int()))
+        job.setPriority(self.priority_ctl.get_int())
         if self.crate_temporary_scene.get_int():
             self.log.debug("Setting post delete file: {}".format(temp_filename))
             job.setPostDeleteFiles(str(temp_filename))
@@ -259,7 +259,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
                 lwsdk.pris.error("Submission failed")
             else:
                 self.log.info("Submission succeeded")
-                self.log.debug("Output:\n{}".format(json.dumps(data)))
+                self.log.debug("Output: {}".format(json.dumps(data)))
                 lwsdk.pris.info("Submission succeeded", json.dumps(data))
         else:
             self.log.info("Submission cancelled")
@@ -281,6 +281,7 @@ class AfanasySubmitter(lwsdk.IGeneric):
         )
         config_parser.set("defaults", "priority", self.priority_ctl.get_int())
         config_parser.set("defaults", "config_dir", self.config_dir_ctl.get_str())
+        config_parser.set("defaults", "branch", self.branch_ctl.get_str())
         config_parser.set("defaults", "host_mask", self.host_mask_ctl.get_str())
         config_parser.set(
             "defaults", "task_max_run_time", self.task_max_run_time.get_int()
